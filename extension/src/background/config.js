@@ -3,9 +3,10 @@
 // can be changed without touching the capture logic.
 
 export const CONFIG = {
-  // Ingestion endpoint. Point this at the local test sink during development,
-  // or at the real backend (e.g. https://your-app.vercel.app) in production.
-  API_BASE: "http://localhost:8787",
+  // Ingestion endpoint. Points at the local backend by default (see
+  // backend/, served on port 3100). Use the local test sink at :8787 for
+  // capture-only testing, or a deployed URL (e.g. https://your-app.vercel.app).
+  API_BASE: "http://localhost:3100",
   INGEST_PATH: "/api/ingest",
 
   // Screenshot capture (LOCKED: interval + key events).
