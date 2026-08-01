@@ -20,3 +20,7 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# Next.js
+.next/
+next-env.d.ts
