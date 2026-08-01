@@ -1,0 +1,282 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import "./dashboard.css";
+
+const POLL_MS = 4000;
+
+function fmtTime(ts) {
+  if (!ts) return "";
+  return new Date(ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function fmtDuration(a, b) {
+  if (!a) return "";
+  const end = b ? new Date(b) : new Date();
+  const secs = Math.max(0, Math.round((end - new Date(a)) / 1000));
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+// Human-readable one-liner for the detail line under an event.
+function eventDetail(e) {
+  const d = e.data || {};
+  switch (e.type) {
+    case "navigation":
+      return d.transitionType
+        ? `${d.phase || "committed"} · ${d.transitionType}${
+            (d.transitionQualifiers || []).length ? " · " + d.transitionQualifiers.join(",") : ""
+          }`
+        : d.phase || null;
+    case "click":
+      return [d.button && `${d.button}-click`, d.target?.text && `"${d.target.text}"`, d.target?.tag]
+        .filter(Boolean)
+        .join(" · ");
+    case "scroll":
+      return d.depthPct != null ? `scroll depth ${d.depthPct}%` : null;
+    case "idle_state":
+      return d.state ? `state: ${d.state}` : null;
+    case "visibility":
+      return d.state || null;
+    case "selection":
+      return d.length != null ? `${d.length} chars selected` : null;
+    case "copy":
+      return d.length != null ? `${d.length} chars copied` : null;
+    case "download":
+      return [d.filename, d.state, d.mime].filter(Boolean).join(" · ") || d.phase || null;
+    case "tab_activated":
+    case "tab_created":
+    case "tab_closed":
+    case "tab_updated":
+      return d.status || (d.index != null ? `index ${d.index}` : null);
+    case "window_focus":
+      return d.focused ? "focused" : "blurred";
+    case "session_start":
+    case "session_end":
+      return d.reason || null;
+    default:
+      return null;
+  }
+}
+
+function StatTile({ value, label, cls }) {
+  return (
+    <div className="stat">
+      <div className={`stat-value ${cls || ""}`}>{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [stats, setStats] = useState({ sessions: 0, events: 0, screenshots: 0, captioned: 0 });
+  const [sessions, setSessions] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [captioning, setCaptioning] = useState(false);
+  const [note, setNote] = useState(null); // {kind, text}
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
+
+  const refresh = useCallback(async () => {
+    try {
+      const [s, st] = await Promise.all([
+        fetch("/api/sessions").then((r) => r.json()),
+        fetch("/api/stats").then((r) => r.json()),
+      ]);
+      if (s.ok) {
+        setSessions(s.sessions);
+        // Auto-select the newest session on first load.
+        if (!selectedRef.current && s.sessions.length) {
+          setSelectedId(s.sessions[0].sessionId);
+        }
+      }
+      if (st.ok) setStats(st.stats);
+    } catch {
+      /* transient; next poll retries */
+    }
+  }, []);
+
+  const refreshDetail = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      const r = await fetch(`/api/sessions/${id}`).then((r) => r.json());
+      if (r.ok) setDetail(r.session);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Poll list + stats.
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, POLL_MS);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  // Poll the selected session's timeline.
+  useEffect(() => {
+    if (!selectedId) return;
+    refreshDetail(selectedId);
+    const t = setInterval(() => refreshDetail(selectedId), POLL_MS);
+    return () => clearInterval(t);
+  }, [selectedId, refreshDetail]);
+
+  async function generateCaptions() {
+    setCaptioning(true);
+    setNote(null);
+    try {
+      const r = await fetch("/api/caption/run", { method: "POST" }).then((r) => r.json());
+      if (r.ok) {
+        setNote({ kind: "ok", text: `Captioned ${r.captioned} screenshot(s).` });
+        await refresh();
+        await refreshDetail(selectedRef.current);
+      } else {
+        setNote({ kind: "err", text: r.error || "captioning failed" });
+      }
+    } catch (e) {
+      setNote({ kind: "err", text: e.message });
+    } finally {
+      setCaptioning(false);
+    }
+  }
+
+  const uncaptioned = stats.screenshots - stats.captioned;
+
+  return (
+    <div className="wrap">
+      <div className="header">
+        <div>
+          <div className="title-row">
+            <span className="rec-dot" aria-hidden />
+            <h1 className="title">Visual AI Agent</h1>
+          </div>
+          <p className="subtitle">Browser activity captured by the extension, stored in Postgres.</p>
+        </div>
+        <div className="stats">
+          <StatTile value={stats.sessions} label="Sessions" />
+          <StatTile value={stats.events} label="Events" />
+          <StatTile value={stats.screenshots} label="Screenshots" cls="accent" />
+          <StatTile value={stats.captioned} label="AI captioned" cls="green" />
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <button className="btn" onClick={generateCaptions} disabled={captioning || uncaptioned <= 0}>
+          {captioning
+            ? "Generating…"
+            : uncaptioned > 0
+              ? `Generate captions (${uncaptioned})`
+              : "All screenshots captioned"}
+        </button>
+        {note && <span className={`toolbar-note ${note.kind}`}>{note.text}</span>}
+        <span className="live">
+          <span className="dot" /> live · refreshes every {POLL_MS / 1000}s
+        </span>
+      </div>
+
+      <div className="grid">
+        <div className="panel">
+          <div className="panel-head">Sessions</div>
+          <div className="session-list">
+            {sessions.length === 0 && (
+              <div className="empty">
+                No sessions yet.
+                <br />
+                Run <code>npm run seed</code> or load the extension and browse.
+              </div>
+            )}
+            {sessions.map((s) => (
+              <div
+                key={s.sessionId}
+                className={`session-card ${s.sessionId === selectedId ? "active" : ""}`}
+                onClick={() => setSelectedId(s.sessionId)}
+              >
+                <div className="session-id">{s.sessionId.slice(0, 8)}…</div>
+                <div className="session-meta">
+                  <span>{fmtTime(s.startedAt)}</span>
+                  <span>{fmtDuration(s.startedAt, s.endedAt)}</span>
+                  <span>{s.eventCount} events</span>
+                  <span>{s.screenshotCount} shots</span>
+                </div>
+                {s.domains.length > 0 && (
+                  <div className="session-domains">
+                    {s.domains.map((d) => (
+                      <span className="chip" key={d}>
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel detail">
+          {!detail ? (
+            <div className="empty">Select a session to view its activity timeline.</div>
+          ) : (
+            <>
+              <div className="detail-head">
+                <div>
+                  <div className="detail-title">Session {detail.sessionId.slice(0, 8)}…</div>
+                  <div className="detail-sub">
+                    {fmtTime(detail.startedAt)} · {detail.events.length} events ·{" "}
+                    {fmtDuration(detail.startedAt, detail.endedAt)}
+                  </div>
+                </div>
+              </div>
+              <div className="timeline">
+                {detail.events.map((e) => (
+                  <div key={e.id}>
+                    <div className="event">
+                      <span className="event-time">{fmtTime(e.ts)}</span>
+                      <span className="event-rail">
+                        <span className="event-node" />
+                      </span>
+                      <span className="event-body">
+                        <span className={`event-type ${e.type}`}>{e.type.replace(/_/g, " ")}</span>
+                        {e.title && <strong>{e.title}</strong>}
+                        {e.url && <div className="event-url">{e.url}</div>}
+                        {eventDetail(e) && <div className="event-detail">{eventDetail(e)}</div>}
+                      </span>
+                    </div>
+                    {e.screenshotId && (
+                      <div className="shot">
+                        <img
+                          src={`/api/screenshots/${e.screenshotId}`}
+                          alt={e.caption || "screenshot"}
+                          loading="lazy"
+                        />
+                        <div className="shot-body">
+                          {e.caption ? (
+                            <div className="shot-caption">
+                              <span className="ai">AI</span>
+                              {e.caption}
+                            </div>
+                          ) : (
+                            <div className="shot-caption pending">
+                              Not yet captioned — click “Generate captions”.
+                            </div>
+                          )}
+                          {e.trigger && <div className="shot-trigger">trigger: {e.trigger}</div>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
