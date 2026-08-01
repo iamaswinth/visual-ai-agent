@@ -9,8 +9,10 @@
     "build": "next build",
     "start": "next start -p 3100",
     "migrate": "node --env-file=.env scripts/migrate.js",
+    "seed": "node --env-file=.env scripts/seed.js",
     "test:ingest": "node --env-file=.env scripts/test-ingest.js",
-    "caption": "node --env-file=.env scripts/caption.js"
+    "caption": "node --env-file=.env scripts/caption.js",
+    "demo": "npm run migrate && npm run seed && next dev -p 3100"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
