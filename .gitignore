@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Local test sink output (captured screenshots / logs)
+tools/local-sink/captures/
+tools/local-sink/*.log
+
+# Env / secrets
+.env
+.env.local
+*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build output
+dist/
+build/
