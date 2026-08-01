@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Visual AI Agent</title>
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <span class="dot" id="statusDot" aria-hidden="true"></span>
+        <h1>Visual AI Agent</h1>
+      </div>
+      <p class="subtitle" id="statusText">Idle</p>
+    </header>
+
+    <section class="toggle-row">
+      <div>
+        <div class="toggle-label">Activity capture</div>
+        <div class="toggle-hint" id="toggleHint">Off — nothing is being recorded</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabledToggle" />
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <div class="stat-value" id="eventCount">0</div>
+        <div class="stat-label">Events captured</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="lastFlush">—</div>
+        <div class="stat-label">Last upload</div>
+      </div>
+    </section>
+
+    <section class="session">
+      <span class="session-label">Session</span>
+      <code id="sessionId">—</code>
+    </section>
+
+    <button class="flush-btn" id="flushBtn">Upload now</button>
+
+    <footer class="footer">
+      <details>
+        <summary>What is captured?</summary>
+        <p>
+          Navigation, tab &amp; window activity, clicks, scroll depth, text
+          selection/copy (length only), idle state, and periodic screenshots.
+        </p>
+        <p class="excluded">
+          Never captured: keystrokes, clipboard text, passwords, or form values.
+        </p>
+      </details>
+    </footer>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
