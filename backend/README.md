@@ -1,75 +1,83 @@
 # Visual AI Agent — Backend
 
-Next.js app that ingests browser-activity batches from the extension and stores
-them in Postgres (NeonDB). Screenshots are stored as raw bytes (`bytea`), with a
-`caption` column reserved for the AI layer to fill in later.
+Next.js app that ingests browser-activity batches from the extension, stores them in Postgres
+(local or NeonDB), captions screenshots with a Claude vision model, and serves a live
+**dashboard** of the tracked activity. Screenshots are stored as raw bytes (`bytea`); the
+`caption` column holds the AI-generated description.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/ingest` | Receive an activity batch and write it to the DB (one transaction). |
+| `POST` | `/api/ingest` | Receive an activity batch from the extension; write it in one transaction. |
+| `GET` | `/api/sessions` | List sessions with event/screenshot/captioned counts + domain summary. |
+| `GET` | `/api/sessions/[id]` | One session's chronological event timeline (screenshot refs, no bytes). |
+| `GET` | `/api/screenshots/[id]` | Stream a stored screenshot as an image (`<img src>` target). |
+| `GET` | `/api/stats` | Header totals (sessions/events/screenshots/captioned). |
+| `POST` | `/api/caption/run` | Caption a batch of uncaptioned screenshots (needs `ANTHROPIC_API_KEY`). |
 | `GET` | `/api/health` | Liveness + database connectivity. |
+
+The dashboard itself is served at `/`.
 
 ## Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env      # then paste your Neon connection string into .env
-npm run migrate           # create tables
-npm run dev               # http://localhost:3000
+cp .env.example .env      # DATABASE_URL is prefilled for the Docker DB below
+npm run demo              # migrate + seed + start on http://localhost:3100
 ```
 
-### Getting a Neon connection string
+`npm run demo` = `migrate` → `seed` → `dev`. Run the steps individually if you prefer:
+`npm run migrate`, `npm run seed`, `npm run dev`.
 
-1. Create a free project at <https://neon.tech>.
-2. Copy the **Pooled connection** string (host contains `-pooler`).
-3. Paste it into `.env` as `DATABASE_URL` (keep `?sslmode=require`).
+### Database
 
-> This backend uses the standard `pg` driver, which talks to Neon over its
-> pooled endpoint and also to a local Postgres. For an edge-runtime deployment
-> you can swap `lib/db.js` for `@neondatabase/serverless`.
+```bash
+docker run --name vaa-pg -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=visual_ai_agent -p 5434:5432 -d postgres:16
+```
+`.env.example` points `DATABASE_URL` at this. For Neon, paste your **pooled** connection string
+(host contains `-pooler`, keep `?sslmode=require`) instead — the `pg` driver handles both.
+
+### AI captioning (the "Visual AI" layer)
+
+Optional but recommended for the demo. Add to `.env`:
+```
+ANTHROPIC_API_KEY=sk-ant-...
+CAPTION_MODEL=claude-opus-5     # optional; any vision-capable Claude model
+```
+Then either click **"Generate captions"** in the dashboard, or run the CLI worker:
+```bash
+npm run caption                 # captions every uncaptioned screenshot in batches
+```
+Without a key the app still runs — the button just reports that no key is set.
 
 ## Data model
 
 ```
 installs (install_id) 1───∞ sessions (session_id) 1───∞ events (id)
                                                           │
-                                                          └──1───1 screenshots (bytea)
+                                                          └──1───1 screenshots (bytea + caption)
 ```
 
-`events.ts` is stored as `timestamptz` (converted from the extension's epoch-ms).
-`events.data` is `jsonb`. See `db/migrations/001_init.sql`.
+`events.ts` is `timestamptz` (from the extension's epoch-ms); `events.data` is `jsonb`; screenshot
+bytes live in `screenshots.bytes`, the AI description in `screenshots.caption`. A partial index
+(`idx_screenshots_uncaptioned`) makes "caption the next batch" cheap. See
+`db/migrations/001_init.sql`.
 
 ## Testing
 
-### Against local/Docker Postgres (no Neon needed)
-
 ```bash
-# start a throwaway Postgres on port 5433
-docker run --name vaa-pg -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=visual_ai_agent -p 5433:5432 -d postgres:16
-
-# point .env at it
-echo 'DATABASE_URL=postgresql://postgres:postgres@localhost:5433/visual_ai_agent' > .env
-
-npm run migrate
-npm run test:ingest     # inserts a sample batch (with a screenshot) and verifies rows
+npm run seed          # populate realistic sessions + screenshots (no Chrome needed)
+npm run test:ingest   # insert a sample batch (with a screenshot) and assert rows exist
+npm run caption       # (with a key) caption everything; verify captions appear on the dashboard
 ```
 
-`npm run test:ingest` exercises the exact `processBatch` code the API route uses,
-so it verifies the full storage path — including decoding a screenshot data URL
-into `bytea` — without booting Next.
-
-### Point the extension at this backend
-
-The extension defaults to `http://localhost:8787`. To send real activity here,
-set `API_BASE` to `http://localhost:3000` in
-`extension/src/background/config.js`, reload the extension, and browse.
+Point the extension here by setting `API_BASE` to `http://localhost:3100` in
+`extension/src/background/config.js` (already the default), reload it, and browse.
 
 ## Deploy
 
-Deploy to Vercel and set `DATABASE_URL` to your Neon pooled string in the
-project's environment variables. Run `npm run migrate` once against the same
-database (locally, pointed at Neon) to create the schema.
+Deploy to Vercel; set `DATABASE_URL` (Neon pooled) and `ANTHROPIC_API_KEY` as environment
+variables. Run `npm run migrate` once against the same database to create the schema.
