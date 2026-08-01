@@ -9,9 +9,11 @@
     "build": "next build",
     "start": "next start -p 3100",
     "migrate": "node --env-file=.env scripts/migrate.js",
-    "test:ingest": "node --env-file=.env scripts/test-ingest.js"
+    "test:ingest": "node --env-file=.env scripts/test-ingest.js",
+    "caption": "node --env-file=.env scripts/caption.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
     "next": "^15.1.6",
     "pg": "^8.13.1",
     "react": "^19.0.0",
