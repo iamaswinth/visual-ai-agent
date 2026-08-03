@@ -1,9 +1,7 @@
-import Dashboard from "./components/Dashboard.js";
+import UsersList from "@/components/UsersList";
 
-// The dashboard is a live, data-driven client app; render it dynamically
-// rather than statically prerendering at build time.
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  return <Dashboard />;
+  return <UsersList />;
 }
