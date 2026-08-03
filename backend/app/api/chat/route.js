@@ -49,6 +49,7 @@ export async function POST(request) {
   if (question.length > 2000)
     return Response.json({ ok: false, error: "question too long" }, { status: 400 });
   const history = Array.isArray(body?.messages) ? body.messages : [];
+  const userId = typeof body?.userId === "string" ? body.userId : null;
 
   try {
     const { userId } = await auth();
@@ -60,7 +61,7 @@ export async function POST(request) {
   }
 
   const pool = getPool();
-  const { system, messages, sources } = await buildChat(pool, question, history);
+  const { system, messages, sources } = await buildChat(pool, question, history, userId);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

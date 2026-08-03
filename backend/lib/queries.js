@@ -8,7 +8,7 @@ import { getPool } from "./db.js";
  * List sessions newest-first with per-session counts and a domain summary.
  * Counts use scalar subqueries (not joins) to avoid cartesian inflation.
  */
-export async function listSessions(limit = 100) {
+export async function listSessions({ userId = null, limit = 100 } = {}) {
   const pool = getPool();
   const { rows } = await pool.query(
     `SELECT
@@ -31,9 +31,10 @@ export async function listSessions(limit = 100) {
        (SELECT array_remove(array_agg(DISTINCT substring(e.url from '://([^/]+)')), NULL)
           FROM events e WHERE e.session_id = s.session_id) AS domains
      FROM sessions s
+     ${userId ? "WHERE s.user_id = $2" : ""}
      ORDER BY s.started_at DESC
      LIMIT $1`,
-    [limit]
+    userId ? [limit, userId] : [limit]
   );
 
   return rows.map((r) => ({
@@ -145,4 +146,53 @@ export async function getScreenshotBytes(id) {
     [id]
   );
   return rows[0] || null;
+}
+
+/** List signed-in users with per-user counts + latest location. */
+export async function listUsers() {
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT u.id, u.email, u.name, u.summary, u.last_seen,
+       (SELECT count(*) FROM sessions s WHERE s.user_id = u.id) AS session_count,
+       (SELECT count(*) FROM documents d WHERE d.user_id = u.id) AS indexed,
+       (SELECT max(started_at) FROM sessions s WHERE s.user_id = u.id) AS last_active,
+       (SELECT city FROM sessions s WHERE s.user_id = u.id AND city IS NOT NULL
+          ORDER BY started_at DESC LIMIT 1) AS city,
+       (SELECT country FROM sessions s WHERE s.user_id = u.id AND country IS NOT NULL
+          ORDER BY started_at DESC LIMIT 1) AS country
+     FROM users u
+     ORDER BY last_active DESC NULLS LAST`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    name: r.name,
+    summary: r.summary,
+    sessionCount: Number(r.session_count),
+    indexed: Number(r.indexed),
+    lastActive: r.last_active,
+    city: r.city,
+    country: r.country,
+  }));
+}
+
+/** One user's profile + their sessions. */
+export async function getUserWithSessions(userId) {
+  const pool = getPool();
+  const u = await pool.query(
+    `SELECT id, email, name, summary, first_seen, last_seen FROM users WHERE id = $1`,
+    [userId]
+  );
+  if (u.rows.length === 0) return null;
+  const sessions = await listSessions({ userId });
+  const m = u.rows[0];
+  return {
+    id: m.id,
+    email: m.email,
+    name: m.name,
+    summary: m.summary,
+    firstSeen: m.first_seen,
+    lastSeen: m.last_seen,
+    sessions,
+  };
 }
