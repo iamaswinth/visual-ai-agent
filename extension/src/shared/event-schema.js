@@ -68,10 +68,11 @@ export function makeEvent(type, fields = {}) {
 /**
  * Wrap a list of events into the batch envelope the ingestion API expects.
  */
-export function makeBatch({ installId, sessionId, events }) {
+export function makeBatch({ installId, sessionId, user, events }) {
   return {
     installId,
     sessionId,
+    user: user || null, // { name, email } of the signed-in extension user
     sentAt: Date.now(),
     events,
   };
