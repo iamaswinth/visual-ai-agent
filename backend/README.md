@@ -44,18 +44,32 @@ docker run --name vaa-pg -e POSTGRES_PASSWORD=postgres \
 `.env.example` points `DATABASE_URL` at this. For Neon, paste your **pooled** connection string
 (host contains `-pooler`, keep `?sslmode=require`) instead — the `pg` driver handles both.
 
-### AI captioning (the "Visual AI" layer)
+### AI features (the "Visual AI" layer)
 
-Optional but recommended for the demo. Add to `.env`:
+Three layers, all optional (the app runs without keys; buttons/chat report when a key is missing):
+
+- **Captions** — one-liner per screenshot (`claude-haiku-4-5`).
+- **Session intelligence** — Claude vision (`claude-sonnet-5`) summarizes each session (title,
+  summary, category, insights) and embeds it for retrieval.
+- **Ask-the-agent chat** — vector RAG: questions are embedded (OpenAI), the closest sessions are
+  retrieved from **pgvector**, and Claude answers grounded in them (falls back to recent sessions
+  without an OpenAI key).
+
+Add to `.env` (see `.env.example` for the model/tuning knobs):
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-CAPTION_MODEL=claude-opus-5     # optional; any vision-capable Claude model
+ANTHROPIC_API_KEY=sk-ant-...     # captions + analysis + chat
+OPENAI_API_KEY=sk-...            # embeddings for vector-RAG chat
 ```
-Then either click **"Generate captions"** in the dashboard, or run the CLI worker:
+Drive them from the dashboard buttons ("Analyze sessions", "Generate captions", "Ask the agent")
+or the CLIs:
 ```bash
-npm run caption                 # captions every uncaptioned screenshot in batches
+npm run caption   # caption uncaptioned screenshots
+npm run analyze   # summarize + embed un-analyzed sessions
+npm run embed     # backfill/refresh embeddings (hash-gated)
 ```
-Without a key the app still runs — the button just reports that no key is set.
+
+> Requires the **pgvector** extension (migration 003 enables it). Neon has it; local dev must use
+> the `pgvector/pgvector:pg16` Docker image (the demo script already does).
 
 ## Data model
 

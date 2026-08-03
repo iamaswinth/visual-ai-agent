@@ -46,8 +46,11 @@ and the extension must use the **same** value.
    | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
    | `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/` |
    | `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/` |
-   | `ANTHROPIC_API_KEY` | *(optional)* enables screenshot captioning |
-   | `CAPTION_MODEL` | *(optional)* defaults to `claude-opus-5` |
+   | `ANTHROPIC_API_KEY` | *(optional)* enables captions, session summaries, and chat |
+   | `OPENAI_API_KEY` | *(optional)* embeddings for vector-RAG chat retrieval |
+   | `CAPTION_MODEL` | *(optional)* default `claude-haiku-4-5` |
+   | `REASONING_MODEL` | *(optional)* default `claude-sonnet-5` (analysis + chat) |
+   | `EMBED_MODEL` | *(optional)* default `text-embedding-3-small` |
 
 4. Deploy. The dashboard is at `https://<project>.vercel.app` (redirects to sign-in), the ingest
    endpoint at `https://<project>.vercel.app/api/ingest`.
