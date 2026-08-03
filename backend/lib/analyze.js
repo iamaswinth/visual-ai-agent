@@ -52,7 +52,7 @@ async function loadSession(pool, sessionId) {
     [sessionId]
   );
   const shots = await pool.query(
-    `SELECT mime, bytes, url, title, caption FROM screenshots
+    `SELECT mime, bytes, caption FROM screenshots
        WHERE session_id = $1 ORDER BY ts DESC LIMIT $2`,
     [sessionId, MAX_SHOTS]
   );
