@@ -15,13 +15,31 @@
       <p class="subtitle" id="statusText">Idle</p>
     </header>
 
+    <!-- Sign in / signed-in -->
+    <section class="auth">
+      <div id="signedOut">
+        <div class="auth-label">Sign in to start monitoring</div>
+        <input id="nameInput" class="auth-input" type="text" placeholder="Your name" autocomplete="name" />
+        <input id="emailInput" class="auth-input" type="email" placeholder="you@example.com" autocomplete="email" />
+        <button id="signInBtn" class="auth-btn">Sign in</button>
+        <div id="authError" class="auth-error"></div>
+      </div>
+      <div id="signedIn" style="display: none">
+        <div class="auth-user">
+          <span id="userName" class="auth-name"></span>
+          <span id="userEmail" class="auth-email"></span>
+        </div>
+        <button id="signOutBtn" class="auth-signout">Sign out</button>
+      </div>
+    </section>
+
     <section class="toggle-row">
       <div>
         <div class="toggle-label">Activity capture</div>
-        <div class="toggle-hint" id="toggleHint">Off — nothing is being recorded</div>
+        <div class="toggle-hint" id="toggleHint">Sign in to enable</div>
       </div>
       <label class="switch">
-        <input type="checkbox" id="enabledToggle" />
+        <input type="checkbox" id="enabledToggle" disabled />
         <span class="slider"></span>
       </label>
     </section>
@@ -42,7 +60,7 @@
       <code id="sessionId">—</code>
     </section>
 
-    <button class="flush-btn" id="flushBtn">Upload now</button>
+    <button class="flush-btn" id="flushBtn" disabled>Upload now</button>
 
     <footer class="footer">
       <details>

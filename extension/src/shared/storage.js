@@ -10,6 +10,7 @@ const KEYS = Object.freeze({
   SESSION: "session", // { sessionId, startedAt, lastActivityAt }
   QUEUE: "eventQueue", // array of normalized events awaiting upload
   STATS: "stats", // { totalEvents, lastFlushAt }
+  USER: "user", // { name, email } — the signed-in extension user
 });
 
 export { KEYS };
@@ -83,4 +84,18 @@ export async function markFlushed() {
 
 export async function getStats() {
   return get(KEYS.STATS, { totalEvents: 0, lastFlushAt: null });
+}
+
+// ---- Signed-in user -------------------------------------------------------
+
+export async function getUser() {
+  return get(KEYS.USER, null); // { name, email } or null
+}
+
+export async function setUser(user) {
+  await set(KEYS.USER, user);
+}
+
+export async function clearUser() {
+  await remove(KEYS.USER);
 }

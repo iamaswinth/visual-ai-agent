@@ -6,7 +6,7 @@
 // service worker is suspended. Failed uploads retry with exponential backoff.
 
 import { CONFIG, ingestUrl } from "./config.js";
-import { KEYS, get, set, bumpStats, markFlushed } from "../shared/storage.js";
+import { KEYS, get, set, bumpStats, markFlushed, getUser } from "../shared/storage.js";
 import { makeBatch } from "../shared/event-schema.js";
 import { getContext } from "./session.js";
 
@@ -61,7 +61,8 @@ export async function flush() {
     if (queue.length === 0) return;
 
     const { installId, sessionId } = await getContext();
-    const batch = makeBatch({ installId, sessionId, events: queue });
+    const user = await getUser();
+    const batch = makeBatch({ installId, sessionId, user, events: queue });
 
     const ok = await postWithRetry(batch);
     if (ok) {
