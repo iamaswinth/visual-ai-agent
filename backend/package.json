@@ -12,6 +12,8 @@
     "seed": "node --env-file=.env scripts/seed.js",
     "test:ingest": "node --env-file=.env scripts/test-ingest.js",
     "caption": "node --env-file=.env scripts/caption.js",
+    "analyze": "node --env-file=.env scripts/analyze.js",
+    "embed": "node --env-file=.env scripts/embed.js",
     "demo": "npm run migrate && npm run seed && next dev -p 3100"
   },
   "dependencies": {

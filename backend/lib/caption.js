@@ -1,13 +1,12 @@
 // AI captioning — the "Visual AI" layer.
 //
 // Turns stored screenshots into one-sentence activity descriptions using a
-// Claude vision model, and writes them back to screenshots.caption. Kept
-// separate from the route/CLI so both share one implementation.
+// cheap/fast Claude vision model, and writes them back to screenshots.caption.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { getPool } from "./db.js";
+import { getAnthropic, captionModel, hasApiKey } from "./ai.js";
 
-const MODEL = process.env.CAPTION_MODEL || "claude-opus-5";
+export { hasApiKey }; // re-exported for existing importers (caption/run route)
 
 const SYSTEM_PROMPT =
   "You are a browser-activity analyst. You are given a screenshot of a web page " +
@@ -19,17 +18,6 @@ const SYSTEM_PROMPT =
 // data: URLs accept only these image media types.
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
-export function hasApiKey() {
-  // The Anthropic SDK accepts either of these env credentials.
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-}
-
-let client;
-function getClient() {
-  if (!client) client = new Anthropic(); // reads ANTHROPIC_API_KEY
-  return client;
-}
-
 /**
  * Caption a single screenshot.
  * @param {{bytes:Buffer, mime:string, url?:string, title?:string}} shot
@@ -39,8 +27,8 @@ export async function captionScreenshot(shot) {
   const mime = ALLOWED_MIME.has(shot.mime) ? shot.mime : "image/jpeg";
   const context = [shot.title, shot.url].filter(Boolean).join(" — ");
 
-  const resp = await getClient().messages.create({
-    model: MODEL,
+  const resp = await getAnthropic().messages.create({
+    model: captionModel(),
     max_tokens: 500,
     system: SYSTEM_PROMPT,
     messages: [
@@ -61,7 +49,6 @@ export async function captionScreenshot(shot) {
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join(" ")
-    // Defensive: strip any stray internal tags before storing.
     .replace(/<\/?thinking>/gi, "")
     .trim();
 
@@ -94,7 +81,6 @@ export async function captionBatch(limit = 10) {
       done += 1;
     } catch (err) {
       console.error(`[caption] screenshot ${row.id} failed:`, err.message);
-      // Leave it uncaptioned so a later run retries; don't abort the batch.
     }
   }
   return done;
