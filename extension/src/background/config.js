@@ -6,11 +6,11 @@ export const CONFIG = {
   // Ingestion endpoint. Points at the local backend by default (see
   // backend/, served on port 3100). Use the local test sink at :8787 for
   // capture-only testing, or a deployed URL (e.g. https://your-app.vercel.app).
-  API_BASE: "http://localhost:3100",
+  API_BASE: "https://visual-ai-agent-phi.vercel.app/",
   INGEST_PATH: "/api/ingest",
   // Shared secret required by a deployed backend (set INGEST_TOKEN there too).
   // Leave empty for local dev where the backend has no token configured.
-  INGEST_TOKEN: "",
+  INGEST_TOKEN: "c1801375eba1b57f9369cd8441ffe918",
 
   // Screenshot capture (LOCKED: interval + key events).
   SCREENSHOT_INTERVAL_MS: 15000, // periodic capture cadence

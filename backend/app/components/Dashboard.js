@@ -24,6 +24,14 @@ function fmtDuration(a, b) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+// Location label for a session, from its captured IP geolocation.
+function locationLabel(s) {
+  if (s.city && s.country) return `${s.city}, ${s.country}`;
+  if (s.country) return s.country;
+  if (s.ip) return s.ip;
+  return "Unknown location";
+}
+
 // Human-readable one-liner for the detail line under an event.
 function eventDetail(e) {
   const d = e.data || {};
@@ -198,10 +206,12 @@ export default function Dashboard() {
                 className={`session-card ${s.sessionId === selectedId ? "active" : ""}`}
                 onClick={() => setSelectedId(s.sessionId)}
               >
-                <div className="session-id">{s.sessionId.slice(0, 8)}…</div>
+                <div className="session-id" style={{ fontFamily: "inherit", fontWeight: 600 }}>
+                  📍 {locationLabel(s)}
+                </div>
                 <div className="session-meta">
+                  {s.ip && <span>{s.ip}</span>}
                   <span>{fmtTime(s.startedAt)}</span>
-                  <span>{fmtDuration(s.startedAt, s.endedAt)}</span>
                   <span>{s.eventCount} events</span>
                   <span>{s.screenshotCount} shots</span>
                 </div>
@@ -226,8 +236,9 @@ export default function Dashboard() {
             <>
               <div className="detail-head">
                 <div>
-                  <div className="detail-title">Session {detail.sessionId.slice(0, 8)}…</div>
+                  <div className="detail-title">📍 {locationLabel(detail)}</div>
                   <div className="detail-sub">
+                    {detail.ip ? `${detail.ip} · ` : ""}
                     {fmtTime(detail.startedAt)} · {detail.events.length} events ·{" "}
                     {fmtDuration(detail.startedAt, detail.endedAt)}
                   </div>

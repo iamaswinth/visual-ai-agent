@@ -41,8 +41,9 @@ function toTimestamp(ms) {
  * Write a batch to the database using the given pg client (or pool).
  * @returns {Promise<{events:number, screenshots:number}>}
  */
-export async function processBatch(client, batch) {
+export async function processBatch(client, batch, meta = {}) {
   const { installId, sessionId, events } = batch;
+  const { ip = null, city = null, country = null, region = null } = meta;
 
   await client.query("BEGIN");
   try {
@@ -54,12 +55,18 @@ export async function processBatch(client, batch) {
       [installId]
     );
 
-    // Upsert session.
+    // Upsert session, recording the ingesting client's IP + geolocation.
+    // COALESCE keeps a previously-known value when the new batch has none.
     await client.query(
-      `INSERT INTO sessions (session_id, install_id)
-         VALUES ($1, $2)
-         ON CONFLICT (session_id) DO UPDATE SET install_id = EXCLUDED.install_id`,
-      [sessionId, installId]
+      `INSERT INTO sessions (session_id, install_id, ip, city, country, region)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (session_id) DO UPDATE SET
+           install_id = EXCLUDED.install_id,
+           ip      = COALESCE(EXCLUDED.ip, sessions.ip),
+           city    = COALESCE(EXCLUDED.city, sessions.city),
+           country = COALESCE(EXCLUDED.country, sessions.country),
+           region  = COALESCE(EXCLUDED.region, sessions.region)`,
+      [sessionId, installId, ip, city, country, region]
     );
 
     let screenshotCount = 0;
