@@ -6,6 +6,7 @@
 
 import { getPool } from "../../../lib/db.js";
 import { processBatch, validateBatch } from "../../../lib/ingest.js";
+import { metaFromHeaders } from "../../../lib/geo.js";
 
 export const runtime = "nodejs";
 
@@ -52,7 +53,7 @@ export async function POST(request) {
   const pool = getPool();
   const client = await pool.connect();
   try {
-    const result = await processBatch(client, batch);
+    const result = await processBatch(client, batch, metaFromHeaders(request.headers));
     return json({ ok: true, ...result });
   } catch (err) {
     console.error("[ingest] failed:", err);

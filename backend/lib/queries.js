@@ -17,6 +17,10 @@ export async function listSessions(limit = 100) {
        s.started_at,
        s.ended_at,
        s.last_event_at,
+       s.ip,
+       s.city,
+       s.country,
+       s.region,
        (SELECT count(*) FROM events e WHERE e.session_id = s.session_id) AS event_count,
        (SELECT count(*) FROM screenshots sc WHERE sc.session_id = s.session_id) AS screenshot_count,
        (SELECT count(*) FROM screenshots sc
@@ -35,6 +39,10 @@ export async function listSessions(limit = 100) {
     startedAt: r.started_at,
     endedAt: r.ended_at,
     lastEventAt: r.last_event_at,
+    ip: r.ip,
+    city: r.city,
+    country: r.country,
+    region: r.region,
     eventCount: Number(r.event_count),
     screenshotCount: Number(r.screenshot_count),
     captionedCount: Number(r.captioned_count),
@@ -51,7 +59,8 @@ export async function getSession(sessionId) {
   const pool = getPool();
 
   const meta = await pool.query(
-    `SELECT session_id, install_id, started_at, ended_at, last_event_at
+    `SELECT session_id, install_id, started_at, ended_at, last_event_at,
+            ip, city, country, region
        FROM sessions WHERE session_id = $1`,
     [sessionId]
   );
@@ -75,6 +84,10 @@ export async function getSession(sessionId) {
     startedAt: m.started_at,
     endedAt: m.ended_at,
     lastEventAt: m.last_event_at,
+    ip: m.ip,
+    city: m.city,
+    country: m.country,
+    region: m.region,
     events: events.rows.map((e) => ({
       id: Number(e.id),
       type: e.type,
