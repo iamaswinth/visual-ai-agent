@@ -1,7 +1,8 @@
 # Deploying the Visual AI Agent
 
-The backend (Next.js) deploys to **Vercel**; the database runs on **Neon** (serverless
-Postgres). The extension is loaded into Chrome and pointed at the deployed backend URL.
+The backend (Next.js) deploys to **Vercel**, the database to **Neon** (serverless Postgres),
+and the dashboard is gated by **Clerk** auth. The extension is loaded into Chrome and pointed at
+the deployed backend, sending a shared `INGEST_TOKEN`.
 
 ## 1. Database — Neon
 
@@ -14,32 +15,58 @@ Postgres). The extension is loaded into Chrome and pointed at the deployed backe
    npm run migrate
    ```
 
-## 2. Backend — Vercel
+## 2. Auth — Clerk
+
+1. Create an application at <https://dashboard.clerk.com>.
+2. From **API keys**, copy:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_...`)
+   - `CLERK_SECRET_KEY` (`sk_...`)
+3. Sign-up is open by default — anyone can register and view the dashboard. To limit it to the
+   interviewer, use Clerk's **Restrictions / Allowlist** settings (add their email), or share a
+   single set of credentials.
+
+## 3. Pick an ingest token
+
+Choose any random secret, e.g. `openssl rand -hex 16`. This is your `INGEST_TOKEN` — the backend
+and the extension must use the **same** value.
+
+## 4. Backend — Vercel
 
 1. Push this repo to GitHub and import it at <https://vercel.com/new>.
-2. **Set the project's Root Directory to `backend`** (this is a monorepo; the Next.js app
-   lives in `backend/`). Vercel auto-detects Next.js from there.
+2. **Set the project's Root Directory to `backend`** (monorepo; the Next.js app is in `backend/`).
 3. Add environment variables (Project → Settings → Environment Variables):
-   - `DATABASE_URL` — the Neon pooled connection string.
-   - `ANTHROPIC_API_KEY` — enables screenshot captioning (optional; the app runs without it).
-   - `CAPTION_MODEL` — optional, defaults to `claude-opus-5`.
-4. Deploy. Your dashboard is at `https://<project>.vercel.app`, the ingest endpoint at
-   `https://<project>.vercel.app/api/ingest`.
 
-> Uses the standard `pg` driver against Neon's pooled endpoint, which is safe on Vercel's
-> serverless functions. `pg` and `@anthropic-ai/sdk` are marked as
-> `serverExternalPackages` so they load at runtime rather than being bundled.
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | Neon pooled connection string |
+   | `INGEST_TOKEN` | the secret from step 3 |
+   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+   | `CLERK_SECRET_KEY` | Clerk secret key |
+   | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` |
+   | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
+   | `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/` |
+   | `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/` |
+   | `ANTHROPIC_API_KEY` | *(optional)* enables screenshot captioning |
+   | `CAPTION_MODEL` | *(optional)* defaults to `claude-opus-5` |
 
-## 3. Extension — point at the deployed backend
+4. Deploy. The dashboard is at `https://<project>.vercel.app` (redirects to sign-in), the ingest
+   endpoint at `https://<project>.vercel.app/api/ingest`.
 
-In `extension/src/background/config.js` set:
+> `pg` and `@anthropic-ai/sdk` are marked `serverExternalPackages` so they load at runtime.
+> `/api/ingest` and `/api/health` are the only public routes; everything else needs a Clerk login.
+
+## 5. Extension — point at the deployed backend
+
+In `extension/src/background/config.js`:
 ```js
 API_BASE: "https://<project>.vercel.app",
+INGEST_TOKEN: "<the same secret from step 3>",
 ```
-Reload the extension (`chrome://extensions` → reload), toggle it on, and browse. Activity flows
-to the deployed backend and appears on the hosted dashboard.
+Reload the extension (`chrome://extensions` → reload), toggle it on, and browse. Activity flows to
+the deployed backend; the interviewer logs in at the Vercel URL and sees it on the dashboard.
 
 ## Local development
 
-See the root `README.md` (`pwsh scripts/demo.ps1`, or `cd backend && npm run demo`), which uses
-Docker Postgres on port 5434 and the backend on 3100.
+`.env` (see `.env.example`) needs `DATABASE_URL`, the Clerk keys (the dashboard won't run without
+them now), and optionally `INGEST_TOKEN`. Then `pwsh scripts/demo.ps1`, or
+`cd backend && npm run demo`. With no `INGEST_TOKEN` set, ingest is open for easy local testing.

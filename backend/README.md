@@ -19,6 +19,10 @@ Next.js app that ingests browser-activity batches from the extension, stores the
 
 The dashboard itself is served at `/`.
 
+**Auth:** all routes require a Clerk login **except** `/api/ingest` and `/api/health`.
+`/api/ingest` instead checks a shared `INGEST_TOKEN` header when that env var is set. See
+`.env.example` for the Clerk + token variables and [`../DEPLOY.md`](../DEPLOY.md) for setup.
+
 ## Setup
 
 ```bash
