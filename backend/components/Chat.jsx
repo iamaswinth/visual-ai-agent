@@ -64,7 +64,12 @@ export default function Chat({ userId, userName }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, messages: history, userId }),
+        body: JSON.stringify({
+          question: q,
+          messages: history,
+          userId,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone, // show times in the viewer's zone
+        }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "chat failed" }));
