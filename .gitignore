@@ -24,3 +24,6 @@ build/
 # Next.js
 .next/
 next-env.d.ts
+
+# Stray design reference, not part of this project
+DESIGN-airtable.md
