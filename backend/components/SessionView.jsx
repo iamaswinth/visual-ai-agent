@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import Chat from "@/components/Chat";
 import { fmtTime, fmtDate, fmtDuration, locationLabel, eventDetail } from "@/components/format";
 
 export default function SessionView({ userId, sessionId }) {
@@ -69,6 +70,9 @@ export default function SessionView({ userId, sessionId }) {
           )}
         </div>
       )}
+
+      {/* Ask the agent — scoped to this session's user (shares the thread with the user page) */}
+      <Chat userId={session.userId || userId} userName={session.userName || session.userEmail || "this user"} />
 
       <Card>
         <CardHeader className="pb-2">

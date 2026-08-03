@@ -1,16 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Markdown from "@/components/Markdown";
 
+const storeKey = (userId) => `vaa-chat-${userId ?? "global"}`;
+
 export default function Chat({ userId, userName }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const loaded = useRef(false);
+
+  // Load this user's saved conversation (runs client-side only, per userId).
+  useEffect(() => {
+    loaded.current = false;
+    try {
+      const raw = localStorage.getItem(storeKey(userId));
+      setMessages(raw ? JSON.parse(raw) : []);
+    } catch {
+      setMessages([]);
+    }
+    loaded.current = true;
+  }, [userId]);
+
+  // Persist on change (skip the initial load write).
+  useEffect(() => {
+    if (!loaded.current) return;
+    try {
+      if (messages.length) localStorage.setItem(storeKey(userId), JSON.stringify(messages));
+      else localStorage.removeItem(storeKey(userId));
+    } catch {
+      /* storage full / unavailable — non-fatal */
+    }
+  }, [messages, userId]);
+
+  function clearChat() {
+    setMessages([]);
+    try {
+      localStorage.removeItem(storeKey(userId));
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function send() {
     const q = input.trim();
@@ -72,6 +107,16 @@ export default function Chat({ userId, userName }) {
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-3 text-[15px] text-ink">
         <span className="inline-block size-2 rounded-full bg-coral" />
         Ask the agent about {userName}
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={clearChat}
+            disabled={streaming}
+            className="ml-auto text-xs font-medium text-muted-foreground transition-colors hover:text-ink disabled:opacity-50"
+          >
+            Clear
+          </button>
+        )}
       </div>
       <ScrollArea className="h-72 px-4 py-3">
         <div className="flex flex-col gap-3">
