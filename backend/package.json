@@ -14,6 +14,7 @@
     "caption": "node --env-file=.env scripts/caption.js",
     "analyze": "node --env-file=.env scripts/analyze.js",
     "embed": "node --env-file=.env scripts/embed.js",
+    "index": "node --env-file=.env scripts/index.js",
     "demo": "npm run migrate && npm run seed && next dev -p 3100"
   },
   "dependencies": {

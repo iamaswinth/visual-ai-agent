@@ -51,9 +51,10 @@ Three layers, all optional (the app runs without keys; buttons/chat report when 
 - **Captions** — one-liner per screenshot (`claude-haiku-4-5`).
 - **Session intelligence** — Claude vision (`claude-sonnet-5`) summarizes each session (title,
   summary, category, insights) and embeds it for retrieval.
-- **Ask-the-agent chat** — vector RAG: questions are embedded (OpenAI), the closest sessions are
-  retrieved from **pgvector**, and Claude answers grounded in them (falls back to recent sessions
-  without an OpenAI key).
+- **Activity index (vector RAG)** — **every event and every screenshot** (as a vision
+  description) is embedded into a `documents` table in **pgvector**. The chat embeds a question,
+  retrieves the most similar activity, and Claude answers grounded in it — citing the exact
+  pages/screens/times. This is the granular store the agent searches (not just a summary).
 
 Add to `.env` (see `.env.example` for the model/tuning knobs):
 ```
@@ -63,10 +64,13 @@ OPENAI_API_KEY=sk-...            # embeddings for vector-RAG chat
 Drive them from the dashboard buttons ("Analyze sessions", "Generate captions", "Ask the agent")
 or the CLIs:
 ```bash
+npm run index     # embed every event + screenshot description into the vector store (for chat)
 npm run caption   # caption uncaptioned screenshots
-npm run analyze   # summarize + embed un-analyzed sessions
-npm run embed     # backfill/refresh embeddings (hash-gated)
+npm run analyze   # per-session AI summaries (dashboard cards)
 ```
+
+The chat searches the granular `documents` index (`npm run index` or the **"Index activity"**
+button). Session summaries (`npm run analyze`) are just for the dashboard headlines.
 
 > Requires the **pgvector** extension (migration 003 enables it). Neon has it; local dev must use
 > the `pgvector/pgvector:pg16` Docker image (the demo script already does).

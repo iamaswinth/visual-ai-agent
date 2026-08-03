@@ -124,7 +124,8 @@ export async function getStats() {
        (SELECT count(*) FROM sessions) AS sessions,
        (SELECT count(*) FROM events) AS events,
        (SELECT count(*) FROM screenshots) AS screenshots,
-       (SELECT count(*) FROM screenshots WHERE caption IS NOT NULL) AS captioned`
+       (SELECT count(*) FROM screenshots WHERE caption IS NOT NULL) AS captioned,
+       (SELECT count(*) FROM documents) AS indexed`
   );
   const r = rows[0];
   return {
@@ -132,6 +133,7 @@ export async function getStats() {
     events: Number(r.events),
     screenshots: Number(r.screenshots),
     captioned: Number(r.captioned),
+    indexed: Number(r.indexed),
   };
 }
 
