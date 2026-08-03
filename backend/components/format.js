@@ -34,6 +34,21 @@ export function locationLabel(o) {
   return o?.country || o?.ip || "Unknown location";
 }
 
+// Rotate signature colors for avatars by a stable seed (id/email).
+const AVATAR_TONES = [
+  "bg-ink text-white",
+  "bg-coral text-white",
+  "bg-forest text-white",
+  "bg-mustard text-ink",
+  "bg-mint text-ink",
+];
+export function avatarTone(seed) {
+  const s = String(seed ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
+
 export function initials(name, email) {
   const src = (name || email || "?").trim();
   const parts = src.split(/[\s@.]+/).filter(Boolean);

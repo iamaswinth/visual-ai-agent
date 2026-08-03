@@ -2,26 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Airtable editorial LIGHT design system (see DESIGN-airtable.md).
+ * White canvas, near-black ink type + CTAs, hairline borders, signature
+ * accent cards for brand voltage. shadcn semantic tokens are mapped to the
+ * Airtable palette (HSL triples so /alpha utilities keep working).
+ */
 @layer base {
   :root {
-    --background: 222 20% 9%;
-    --foreground: 210 20% 92%;
-    --card: 222 16% 13%;
-    --card-foreground: 210 20% 92%;
-    --primary: 217 91% 63%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 222 14% 17%;
-    --secondary-foreground: 210 20% 92%;
-    --muted: 222 14% 17%;
-    --muted-foreground: 215 14% 60%;
-    --accent: 222 14% 20%;
-    --accent-foreground: 210 20% 92%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 222 14% 22%;
-    --input: 222 14% 22%;
-    --ring: 217 91% 63%;
-    --radius: 0.65rem;
+    --background: 0 0% 100%; /* canvas #ffffff */
+    --foreground: 218 23% 12%; /* ink #181d26 */
+    --card: 0 0% 100%;
+    --card-foreground: 218 23% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 23% 12%;
+    --primary: 218 23% 12%; /* ink — near-black CTA */
+    --primary-foreground: 0 0% 100%; /* on-primary */
+    --secondary: 210 40% 98%; /* surface-soft #f8fafc */
+    --secondary-foreground: 218 23% 12%;
+    --muted: 210 40% 98%;
+    --muted-foreground: 220 11% 28%; /* muted #41454d */
+    --accent: 225 10% 89%; /* surface-strong #e0e2e6 */
+    --accent-foreground: 218 23% 12%;
+    --destructive: 16 100% 33%; /* signature-coral #aa2d00 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 87%; /* hairline #dddddd */
+    --input: 0 0% 87%;
+    --ring: 216 100% 64%; /* info-border #458fff */
+    --radius: 0.75rem; /* 12px — primary CTA / signature cards */
   }
 }
 
@@ -31,6 +39,13 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Haas prefers modest weights — never bold for its own sake. */
+  h1, h2, h3 {
+    font-weight: 400;
+    letter-spacing: 0;
   }
 }
