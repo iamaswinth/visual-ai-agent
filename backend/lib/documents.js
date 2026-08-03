@@ -1,8 +1,8 @@
 // Granular activity indexing for RAG.
 //
-// Turns every event and every screenshot into an embedded "document" so the
-// chat can retrieve the actual activity (what was seen, where they navigated,
-// what they did) — not just a session summary.
+// Turns every event and every screenshot (as a vision description) into an
+// embedded "document" so the chat can retrieve the actual activity — scoped per
+// user. Incremental + idempotent (unique indexes on event_id / screenshot_id).
 
 import { getPool } from "./db.js";
 import { hasOpenAI, embedTexts, toPgVector } from "./embed.js";
@@ -13,10 +13,7 @@ const host = (u) => {
   return m ? m[1] : null;
 };
 
-/**
- * Render one event as a natural-language sentence to embed. Every event type is
- * covered so "everything" is searchable.
- */
+/** Render one event as a natural-language sentence to embed. */
 export function renderEvent(e) {
   const d = e.data || {};
   const at = e.url ? ` at ${host(e.url)}` : "";
@@ -59,49 +56,41 @@ export function renderEvent(e) {
   }
 }
 
-/** Gather up to `limit` un-indexed units (events + captioned screenshots). */
-async function pending(pool, limit) {
+/** Gather up to `limit` un-indexed units (events + captioned screenshots), optionally one session. */
+async function pending(pool, limit, sessionId = null) {
+  const filt = sessionId ? "AND e.session_id = $2" : "";
   const events = await pool.query(
-    `SELECT e.id, e.session_id, e.install_id, e.type, e.ts, e.url, e.title, e.data
+    `SELECT e.id, e.session_id, e.install_id, s.user_id, e.type, e.ts, e.url, e.title, e.data
        FROM events e
-      WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.event_id = e.id)
+       JOIN sessions s ON s.session_id = e.session_id
+      WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.event_id = e.id) ${filt}
       ORDER BY e.ts ASC
       LIMIT $1`,
-    [limit]
+    sessionId ? [limit, sessionId] : [limit]
   );
+  const sfilt = sessionId ? "AND sc.session_id = $2" : "";
   const shots = await pool.query(
-    `SELECT sc.id, sc.session_id, sc.install_id, sc.ts, sc.caption,
-            ev.url, ev.title
+    `SELECT sc.id, sc.session_id, sc.install_id, s.user_id, sc.ts, sc.caption, ev.url, ev.title
        FROM screenshots sc
+       JOIN sessions s ON s.session_id = sc.session_id
        LEFT JOIN events ev ON ev.id = sc.event_id
       WHERE sc.caption IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.screenshot_id = sc.id)
+        AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.screenshot_id = sc.id) ${sfilt}
       ORDER BY sc.ts ASC
       LIMIT $1`,
-    [limit]
+    sessionId ? [limit, sessionId] : [limit]
   );
   return { events: events.rows, shots: shots.rows };
 }
 
-/**
- * Index a batch: caption a few screenshots, then build + embed documents for
- * un-indexed events and captioned screenshots. Idempotent (unique indexes).
- * @returns {Promise<{indexed:number, captioned:number, remaining:number}>}
- */
-export async function indexBatch(limit = 80) {
-  const pool = getPool();
-
-  // Ensure some screenshots have descriptions (that's the "what they saw" text).
-  const captioned = await captionBatch(6);
-
-  const { events, shots } = await pending(pool, limit);
-
-  // Build the document rows (without embeddings yet).
+/** Build document rows from pending events/screenshots, embed, and insert. */
+async function indexRows(pool, events, shots) {
   const docs = [];
   for (const e of events) {
     docs.push({
       session_id: e.session_id,
       install_id: e.install_id,
+      user_id: e.user_id,
       kind: e.type,
       event_id: e.id,
       screenshot_id: null,
@@ -116,6 +105,7 @@ export async function indexBatch(limit = 80) {
     docs.push({
       session_id: s.session_id,
       install_id: s.install_id,
+      user_id: s.user_id,
       kind: "screenshot",
       event_id: null,
       screenshot_id: s.id,
@@ -125,10 +115,8 @@ export async function indexBatch(limit = 80) {
       text: `Screen viewed${where}: ${s.caption}`,
     });
   }
+  if (docs.length === 0) return 0;
 
-  if (docs.length === 0) return { indexed: 0, captioned, remaining: 0 };
-
-  // Embed in sub-batches (OpenAI accepts arrays).
   let indexed = 0;
   const CHUNK = 96;
   for (let i = 0; i < docs.length; i += CHUNK) {
@@ -139,23 +127,21 @@ export async function indexBatch(limit = 80) {
         vectors = await embedTexts(slice.map((d) => d.text));
       } catch (err) {
         console.error("[index] embedding failed:", err.message);
-        break; // stop this run; already-inserted rows persist, rest retried later
+        break;
       }
     }
-    // Insert rows (with embeddings when available). ON CONFLICT does nothing so
-    // re-runs are safe.
     for (let j = 0; j < slice.length; j++) {
       const d = slice[j];
       const vec = vectors[j] ? toPgVector(vectors[j]) : null;
       try {
         await pool.query(
           `INSERT INTO documents
-             (session_id, install_id, kind, event_id, screenshot_id, ts, url, title, text, embedding)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,${vec ? "$10::vector" : "NULL"})
+             (session_id, install_id, user_id, kind, event_id, screenshot_id, ts, url, title, text, embedding)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,${vec ? "$11::vector" : "NULL"})
            ON CONFLICT DO NOTHING`,
           vec
-            ? [d.session_id, d.install_id, d.kind, d.event_id, d.screenshot_id, d.ts, d.url, d.title, d.text, vec]
-            : [d.session_id, d.install_id, d.kind, d.event_id, d.screenshot_id, d.ts, d.url, d.title, d.text]
+            ? [d.session_id, d.install_id, d.user_id, d.kind, d.event_id, d.screenshot_id, d.ts, d.url, d.title, d.text, vec]
+            : [d.session_id, d.install_id, d.user_id, d.kind, d.event_id, d.screenshot_id, d.ts, d.url, d.title, d.text]
         );
         indexed += 1;
       } catch (err) {
@@ -163,14 +149,30 @@ export async function indexBatch(limit = 80) {
       }
     }
   }
+  return indexed;
+}
 
-  // How much is still un-indexed (for the button's counter).
+/** Index a global batch (used by the manual button / CLI). */
+export async function indexBatch(limit = 80) {
+  const pool = getPool();
+  const captioned = await captionBatch(6);
+  const { events, shots } = await pending(pool, limit);
+  const indexed = await indexRows(pool, events, shots);
   const rem = await pool.query(
     `SELECT
        (SELECT count(*) FROM events e WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.event_id = e.id))
      + (SELECT count(*) FROM screenshots s WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.screenshot_id = s.id)) AS remaining`
   );
   return { indexed, captioned, remaining: Number(rem.rows[0].remaining) };
+}
+
+/** Index a single session's activity (used by auto-index on session end). */
+export async function indexSession(pool, sessionId) {
+  // Caption a bounded number of screenshots so "what they saw" is searchable
+  // without blowing the serverless time budget on a big session.
+  await captionBatch(8);
+  const { events, shots } = await pending(pool, 500, sessionId);
+  return indexRows(pool, events, shots);
 }
 
 /** Count of activity units not yet indexed (for the dashboard button). */

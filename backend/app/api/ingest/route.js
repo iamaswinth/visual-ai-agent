@@ -7,8 +7,11 @@
 import { getPool } from "../../../lib/db.js";
 import { processBatch, validateBatch } from "../../../lib/ingest.js";
 import { metaFromHeaders } from "../../../lib/geo.js";
+import { indexSession } from "../../../lib/documents.js";
+import { updateUserSummary } from "../../../lib/users.js";
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // allow inline auto-indexing on session end
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -52,13 +55,26 @@ export async function POST(request) {
 
   const pool = getPool();
   const client = await pool.connect();
+  let result;
   try {
-    const result = await processBatch(client, batch, metaFromHeaders(request.headers));
-    return json({ ok: true, ...result });
+    result = await processBatch(client, batch, metaFromHeaders(request.headers));
   } catch (err) {
     console.error("[ingest] failed:", err);
     return json({ ok: false, error: "internal error" }, 500);
   } finally {
     client.release();
   }
+
+  // When a session ends, index its activity and refresh the user's rolling
+  // summary — incrementally, best-effort (never fails the ingest response).
+  if (result.sessionEnded) {
+    try {
+      await indexSession(pool, result.sessionId);
+      await updateUserSummary(pool, result.userId);
+    } catch (err) {
+      console.error("[ingest] auto-index failed:", err.message);
+    }
+  }
+
+  return json({ ok: true, ...result });
 }
