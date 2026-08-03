@@ -67,12 +67,12 @@ export default function Chat({ userId, userName }) {
   }
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border bg-card">
-      <div className="border-b px-4 py-3 text-sm font-medium">💬 Ask the agent about {userName}</div>
+    <div className="flex flex-col overflow-hidden rounded-md border border-hairline bg-canvas">
+      <div className="border-b border-hairline px-4 py-3 text-[15px] text-ink">Ask the agent about {userName}</div>
       <ScrollArea className="h-72 px-4 py-3">
         <div className="flex flex-col gap-3">
           {messages.length === 0 && (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm leading-relaxed text-muted-foreground">
               e.g. “What did {userName} do today?”, “Any shopping sessions?”, “Which sites did they visit most?”
             </div>
           )}
@@ -80,9 +80,11 @@ export default function Chat({ userId, userName }) {
             <div
               key={i}
               className={cn(
-                "max-w-[85%] whitespace-pre-wrap rounded-lg border px-3 py-2 text-sm",
-                m.role === "user" ? "self-end border-primary/40 bg-primary/15" : "self-start bg-secondary",
-                m.error && "border-destructive/50"
+                "max-w-[85%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm",
+                m.role === "user"
+                  ? "self-end bg-ink text-white"
+                  : "self-start border border-hairline bg-surface-soft text-ink",
+                m.error && "border-coral text-coral"
               )}
             >
               <div>{m.content || (m.role === "assistant" && streaming && i === messages.length - 1 ? "…" : "")}</div>
@@ -96,7 +98,7 @@ export default function Chat({ userId, userName }) {
         </div>
       </ScrollArea>
       <form
-        className="flex gap-2 border-t p-3"
+        className="flex gap-2 border-t border-hairline p-3"
         onSubmit={(e) => {
           e.preventDefault();
           send();
@@ -108,7 +110,7 @@ export default function Chat({ userId, userName }) {
           placeholder={`Ask about ${userName}…`}
           disabled={streaming}
         />
-        <Button type="submit" disabled={streaming || !input.trim()}>
+        <Button type="submit" size="sm" className="h-11 px-5" disabled={streaming || !input.trim()}>
           {streaming ? "…" : "Send"}
         </Button>
       </form>
