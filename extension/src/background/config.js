@@ -37,5 +37,7 @@ export const CONFIG = {
 };
 
 export function ingestUrl() {
-  return `${CONFIG.API_BASE}${CONFIG.INGEST_PATH}`;
+  // Tolerate a trailing slash on API_BASE so we don't post to "//api/ingest"
+  // (which redirects 308 and can drop the POST body).
+  return `${CONFIG.API_BASE.replace(/\/+$/, "")}${CONFIG.INGEST_PATH}`;
 }
