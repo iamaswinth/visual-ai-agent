@@ -90,6 +90,10 @@ export default function Dashboard() {
   const [captioning, setCaptioning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [note, setNote] = useState(null); // {kind, text}
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]); // {role, content, sources?, error?}
+  const [chatInput, setChatInput] = useState("");
+  const [chatStreaming, setChatStreaming] = useState(false);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
 
@@ -175,6 +179,61 @@ export default function Dashboard() {
     }
   }
 
+  async function sendChat() {
+    const q = chatInput.trim();
+    if (!q || chatStreaming) return;
+    const history = chatMessages.map((m) => ({ role: m.role, content: m.content }));
+    setChatMessages((prev) => [...prev, { role: "user", content: q }, { role: "assistant", content: "", sources: [] }]);
+    setChatInput("");
+    setChatStreaming(true);
+    const patchLast = (fn) =>
+      setChatMessages((prev) => {
+        const c = [...prev];
+        c[c.length - 1] = fn(c[c.length - 1]);
+        return c;
+      });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, messages: history }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: "chat failed" }));
+        patchLast((m) => ({ ...m, content: err.error || "chat failed", error: true }));
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop();
+        for (const p of parts) {
+          const ev = /event: (.*)/.exec(p)?.[1];
+          const dm = /data: ([\s\S]*)/.exec(p)?.[1];
+          if (!dm) continue;
+          let data;
+          try {
+            data = JSON.parse(dm);
+          } catch {
+            continue;
+          }
+          if (ev === "sources") patchLast((m) => ({ ...m, sources: data }));
+          else if (ev === "delta") patchLast((m) => ({ ...m, content: m.content + data.text }));
+          else if (ev === "error") patchLast((m) => ({ ...m, content: m.content + "\n[error generating answer]", error: true }));
+        }
+      }
+    } catch (e) {
+      patchLast((m) => ({ ...m, content: e.message, error: true }));
+    } finally {
+      setChatStreaming(false);
+    }
+  }
+
   const uncaptioned = stats.screenshots - stats.captioned;
   const unanalyzed = sessions.filter((s) => !s.analyzedAt).length;
 
@@ -211,11 +270,57 @@ export default function Dashboard() {
               ? `Generate captions (${uncaptioned})`
               : "All screenshots captioned"}
         </button>
+        <button className="btn ghost" onClick={() => setChatOpen((o) => !o)}>
+          {chatOpen ? "Close chat" : "💬 Ask the agent"}
+        </button>
         {note && <span className={`toolbar-note ${note.kind}`}>{note.text}</span>}
         <span className="live">
           <span className="dot" /> live · refreshes every {POLL_MS / 1000}s
         </span>
       </div>
+
+      {chatOpen && (
+        <div className="chat">
+          <div className="chat-thread">
+            {chatMessages.length === 0 && (
+              <div className="chat-empty">
+                Ask about the captured activity — e.g. “What did the user do today?”, “Any shopping
+                sessions?”, “Where were users located?”
+              </div>
+            )}
+            {chatMessages.map((m, i) => (
+              <div key={i} className={`bubble ${m.role} ${m.error ? "error" : ""}`}>
+                <div className="bubble-text">
+                  {m.content ||
+                    (m.role === "assistant" && chatStreaming && i === chatMessages.length - 1 ? "…" : "")}
+                </div>
+                {m.role === "assistant" && m.sources?.length > 0 && (
+                  <div className="bubble-sources">
+                    sources: {m.sources.map((s) => s.title).filter(Boolean).join(" · ") || "—"}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <form
+            className="chat-input"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendChat();
+            }}
+          >
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask the agent about the activity…"
+              disabled={chatStreaming}
+            />
+            <button className="btn" type="submit" disabled={chatStreaming || !chatInput.trim()}>
+              {chatStreaming ? "…" : "Send"}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="grid">
         <div className="panel">

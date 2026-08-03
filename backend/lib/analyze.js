@@ -133,27 +133,44 @@ export async function analyzeSession(pool, sessionId) {
     [title, summary, category, JSON.stringify(insights), sessionId]
   );
 
-  // Embed the understanding for RAG — only if the source text changed.
-  let embedded = false;
-  const embedSource = [title, summary, category, domains.join(", "), ...insights].join(" | ");
-  const hash = crypto.createHash("sha256").update(embedSource).digest("hex");
-  if (hasOpenAI()) {
-    const cur = await pool.query(`SELECT embedding_hash FROM sessions WHERE session_id = $1`, [sessionId]);
-    if (cur.rows[0]?.embedding_hash !== hash) {
-      try {
-        const vec = await embedText(embedSource);
-        await pool.query(
-          `UPDATE sessions SET embedding = $1::vector, embedding_hash = $2 WHERE session_id = $3`,
-          [toPgVector(vec), hash, sessionId]
-        );
-        embedded = true;
-      } catch (err) {
-        console.error(`[analyze] embed ${sessionId} failed:`, err.message);
-      }
-    }
-  }
+  // Embed the understanding for RAG — hash-gated (re-embed only on change).
+  const cur = await pool.query(`SELECT embedding_hash FROM sessions WHERE session_id = $1`, [sessionId]);
+  const embedded = await embedAndStore(
+    pool,
+    sessionId,
+    embedSourceText({ title, summary, category, insights }),
+    cur.rows[0]?.embedding_hash
+  );
 
   return { title, category, embedded };
+}
+
+/** The text we embed for a session (kept stable so the hash is reproducible). */
+export function embedSourceText({ title, summary, category, insights }) {
+  return [title, summary, category, ...(insights || [])].join(" | ");
+}
+
+/**
+ * Embed `source` and store it on the session, but only when its hash differs
+ * from `priorHash` (so unchanged sessions are never re-embedded). No-op without
+ * an OpenAI key. Shared by analyzeSession and the embed-backfill script.
+ * @returns {Promise<boolean>} whether a new embedding was written
+ */
+export async function embedAndStore(pool, sessionId, source, priorHash) {
+  if (!hasOpenAI()) return false;
+  const hash = crypto.createHash("sha256").update(source).digest("hex");
+  if (priorHash === hash) return false;
+  try {
+    const vec = await embedText(source);
+    await pool.query(
+      `UPDATE sessions SET embedding = $1::vector, embedding_hash = $2 WHERE session_id = $3`,
+      [toPgVector(vec), hash, sessionId]
+    );
+    return true;
+  } catch (err) {
+    console.error(`[embed] session ${sessionId} failed:`, err.message);
+    return false;
+  }
 }
 
 /**
