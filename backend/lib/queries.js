@@ -66,10 +66,13 @@ export async function getSession(sessionId) {
   const pool = getPool();
 
   const meta = await pool.query(
-    `SELECT session_id, install_id, started_at, ended_at, last_event_at,
-            ip, city, country, region,
-            ai_title, ai_summary, ai_category, ai_insights, analyzed_at
-       FROM sessions WHERE session_id = $1`,
+    `SELECT s.session_id, s.install_id, s.started_at, s.ended_at, s.last_event_at,
+            s.ip, s.city, s.country, s.region,
+            s.ai_title, s.ai_summary, s.ai_category, s.ai_insights, s.analyzed_at,
+            s.user_id, u.name AS user_name, u.email AS user_email
+       FROM sessions s
+       LEFT JOIN users u ON u.id = s.user_id
+      WHERE s.session_id = $1`,
     [sessionId]
   );
   if (meta.rows.length === 0) return null;
@@ -101,6 +104,9 @@ export async function getSession(sessionId) {
     aiCategory: m.ai_category,
     aiInsights: m.ai_insights || [],
     analyzedAt: m.analyzed_at,
+    userId: m.user_id,
+    userName: m.user_name,
+    userEmail: m.user_email,
     events: events.rows.map((e) => ({
       id: Number(e.id),
       type: e.type,
