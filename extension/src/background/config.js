@@ -8,6 +8,9 @@ export const CONFIG = {
   // capture-only testing, or a deployed URL (e.g. https://your-app.vercel.app).
   API_BASE: "http://localhost:3100",
   INGEST_PATH: "/api/ingest",
+  // Shared secret required by a deployed backend (set INGEST_TOKEN there too).
+  // Leave empty for local dev where the backend has no token configured.
+  INGEST_TOKEN: "",
 
   // Screenshot capture (LOCKED: interval + key events).
   SCREENSHOT_INTERVAL_MS: 15000, // periodic capture cadence
