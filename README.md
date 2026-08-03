@@ -50,6 +50,11 @@ pwsh scripts/demo.ps1
 This starts Postgres, migrates, seeds realistic demo data, and launches the dashboard at
 **http://localhost:3100**. You'll immediately see seeded sessions with screenshots.
 
+> **Auth:** the dashboard is gated by **Clerk**, so `backend/.env` now needs your Clerk keys
+> (see `.env.example`) to run the dashboard — sign in, then view the data. `/api/ingest` stays
+> outside auth but requires a shared `INGEST_TOKEN` header when one is configured. Full hosted
+> setup (Vercel + Neon + Clerk) is in [`DEPLOY.md`](DEPLOY.md).
+
 To light up the **AI captions**, add a key to `backend/.env`:
 ```
 ANTHROPIC_API_KEY=sk-ant-...
