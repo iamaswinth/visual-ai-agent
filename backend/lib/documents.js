@@ -166,12 +166,9 @@ export async function indexBatch(limit = 80) {
   return { indexed, captioned, remaining: Number(rem.rows[0].remaining) };
 }
 
-/** Index a single session's activity (used by auto-index on session end). */
+/** Index a single session's already-captioned activity (caller captions first). */
 export async function indexSession(pool, sessionId) {
-  // Caption a bounded number of screenshots so "what they saw" is searchable
-  // without blowing the serverless time budget on a big session.
-  await captionBatch(8);
-  const { events, shots } = await pending(pool, 500, sessionId);
+  const { events, shots } = await pending(pool, 1000, sessionId);
   return indexRows(pool, events, shots);
 }
 

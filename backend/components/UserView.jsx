@@ -31,21 +31,16 @@ export default function UserView({ userId }) {
 
   async function indexNow() {
     setIndexing(true);
-    setNote(null);
+    setNote("Processing — describing screens, analyzing sessions, indexing…");
     try {
-      let total = 0;
-      for (let i = 0; i < 25; i++) {
-        const r = await fetch("/api/index/run", { method: "POST" }).then((r) => r.json());
-        if (!r.ok) {
-          setNote(r.error || "indexing failed");
-          break;
-        }
-        total += r.indexed;
-        setNote(`Indexed ${total} activity items… (${r.remaining} left)`);
-        if (r.remaining === 0 || r.indexed === 0) {
-          setNote(`Indexed ${total} activity items — the agent can search them now.`);
-          break;
-        }
+      const r = await fetch(`/api/users/${userId}/process`, { method: "POST" }).then((r) => r.json());
+      if (!r.ok) {
+        setNote(r.error || "processing failed");
+      } else {
+        setNote(
+          `Done — analyzed ${r.analyzed} session(s), indexed ${r.indexed} items` +
+            (r.summary ? ", updated profile." : ".")
+        );
       }
       load();
     } catch (e) {

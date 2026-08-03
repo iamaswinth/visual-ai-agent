@@ -7,8 +7,7 @@
 import { getPool } from "../../../lib/db.js";
 import { processBatch, validateBatch } from "../../../lib/ingest.js";
 import { metaFromHeaders } from "../../../lib/geo.js";
-import { indexSession } from "../../../lib/documents.js";
-import { updateUserSummary } from "../../../lib/users.js";
+import { processSession } from "../../../lib/pipeline.js";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // allow inline auto-indexing on session end
@@ -65,15 +64,10 @@ export async function POST(request) {
     client.release();
   }
 
-  // When a session ends, index its activity and refresh the user's rolling
-  // summary — incrementally, best-effort (never fails the ingest response).
+  // When a session ends, run the full pipeline (caption -> analyze -> index ->
+  // profile) — best-effort, never fails the ingest response.
   if (result.sessionEnded) {
-    try {
-      await indexSession(pool, result.sessionId);
-      await updateUserSummary(pool, result.userId);
-    } catch (err) {
-      console.error("[ingest] auto-index failed:", err.message);
-    }
+    await processSession(pool, result.sessionId, result.userId);
   }
 
   return json({ ok: true, ...result });
