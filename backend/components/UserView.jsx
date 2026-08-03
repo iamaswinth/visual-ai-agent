@@ -78,11 +78,17 @@ export default function UserView({ userId }) {
           </p>
         </div>
         <div className="ml-auto flex flex-col items-end gap-1.5">
-          <Button onClick={indexNow} disabled={indexing}>
+          <Button
+            onClick={indexNow}
+            disabled={indexing}
+            title="Describe screenshots, summarize sessions, and refresh this user's AI profile so the agent can answer questions about them."
+          >
             <Sparkles className="size-4" />
-            {indexing ? "Indexing…" : "Index now"}
+            {indexing ? "Analyzing…" : "Analyze activity"}
           </Button>
-          {note && <span className="max-w-[240px] text-right text-xs text-muted-foreground">{note}</span>}
+          <span className="max-w-[260px] text-right text-xs leading-snug text-muted-foreground">
+            {note || "Describe screens, summarize sessions & refresh the AI profile. Runs automatically when a session ends."}
+          </span>
         </div>
       </div>
 
@@ -92,7 +98,7 @@ export default function UserView({ userId }) {
         <p className="mt-4 max-w-3xl text-[17px] leading-relaxed text-white/90">
           {user.summary || (
             <span className="text-white/50">
-              No profile yet — it’s generated automatically when this user’s sessions end (or press “Index now”).
+              No profile yet — it’s generated automatically when this user’s sessions end (or press “Analyze activity”).
             </span>
           )}
         </p>
