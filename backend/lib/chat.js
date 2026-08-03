@@ -16,17 +16,17 @@ const MIN_SCORE = Number(process.env.RAG_MIN_SCORE) || 0.12;
  * Retrieve the activity documents most relevant to `question`.
  * Vector search when embeddings exist; otherwise the most recent documents.
  */
-export async function retrieve(pool, question, { k = TOP_K, minScore = MIN_SCORE } = {}) {
+export async function retrieve(pool, question, { k = TOP_K, minScore = MIN_SCORE, userId = null } = {}) {
   if (hasOpenAI()) {
     try {
       const vec = toPgVector(await embedText(question));
       const { rows } = await pool.query(
         `SELECT kind, ts, url, title, text, 1 - (embedding <=> $1::vector) AS score
            FROM documents
-          WHERE embedding IS NOT NULL
+          WHERE embedding IS NOT NULL ${userId ? "AND user_id = $3" : ""}
           ORDER BY embedding <=> $1::vector
           LIMIT $2`,
-        [vec, k]
+        userId ? [vec, k, userId] : [vec, k]
       );
       const relevant = rows.filter((r) => Number(r.score) >= minScore);
       const chosen = relevant.length ? relevant : rows.slice(0, Math.min(6, rows.length));
@@ -36,8 +36,10 @@ export async function retrieve(pool, question, { k = TOP_K, minScore = MIN_SCORE
     }
   }
   const { rows } = await pool.query(
-    `SELECT kind, ts, url, title, text FROM documents ORDER BY ts DESC LIMIT $1`,
-    [k]
+    `SELECT kind, ts, url, title, text FROM documents
+      ${userId ? "WHERE user_id = $2" : ""}
+      ORDER BY ts DESC LIMIT $1`,
+    userId ? [k, userId] : [k]
   );
   return rows;
 }
@@ -61,11 +63,19 @@ function fmtDoc(r, i) {
  * Build the retrieval + prompt for a question. Returns { system, messages,
  * sources, hasContext }.
  */
-export async function buildChat(pool, question, history = []) {
-  const rows = await retrieve(pool, question);
+export async function buildChat(pool, question, history = [], userId = null) {
+  const rows = await retrieve(pool, question, { userId });
+
+  // The user's rolling summary gives the agent a profile to reason from.
+  let profile = "";
+  if (userId) {
+    const u = await pool.query(`SELECT name, summary FROM users WHERE id = $1`, [userId]);
+    const row = u.rows[0];
+    if (row?.summary) profile = `USER PROFILE (${row.name || "user"}): ${row.summary}\n\n`;
+  }
 
   const contextText =
-    rows.map(fmtDoc).join("\n") || "(no indexed activity available)";
+    profile + (rows.map(fmtDoc).join("\n") || "(no indexed activity available)");
 
   const priorTurns = history
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
