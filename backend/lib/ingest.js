@@ -44,6 +44,8 @@ function toTimestamp(ms) {
 export async function processBatch(client, batch, meta = {}) {
   const { installId, sessionId, events } = batch;
   const { ip = null, city = null, country = null, region = null } = meta;
+  const email = batch.user?.email ? String(batch.user.email).trim().toLowerCase() : null;
+  const name = batch.user?.name ? String(batch.user.name).trim() : null;
 
   await client.query("BEGIN");
   try {
@@ -55,18 +57,34 @@ export async function processBatch(client, batch, meta = {}) {
       [installId]
     );
 
-    // Upsert session, recording the ingesting client's IP + geolocation.
+    // Upsert the signed-in user (by email); tag the session to them.
+    let userId = null;
+    if (email) {
+      const u = await client.query(
+        `INSERT INTO users (email, name)
+           VALUES ($1, $2)
+           ON CONFLICT (email) DO UPDATE SET
+             name = COALESCE(EXCLUDED.name, users.name),
+             last_seen = now()
+         RETURNING id`,
+        [email, name]
+      );
+      userId = u.rows[0].id;
+    }
+
+    // Upsert session with the user + the ingesting client's IP/geolocation.
     // COALESCE keeps a previously-known value when the new batch has none.
     await client.query(
-      `INSERT INTO sessions (session_id, install_id, ip, city, country, region)
-         VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO sessions (session_id, install_id, user_id, ip, city, country, region)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (session_id) DO UPDATE SET
            install_id = EXCLUDED.install_id,
+           user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
            ip      = COALESCE(EXCLUDED.ip, sessions.ip),
            city    = COALESCE(EXCLUDED.city, sessions.city),
            country = COALESCE(EXCLUDED.country, sessions.country),
            region  = COALESCE(EXCLUDED.region, sessions.region)`,
-      [sessionId, installId, ip, city, country, region]
+      [sessionId, installId, userId, ip, city, country, region]
     );
 
     let screenshotCount = 0;
@@ -142,7 +160,8 @@ export async function processBatch(client, batch, meta = {}) {
     }
 
     await client.query("COMMIT");
-    return { events: events.length, screenshots: screenshotCount };
+    const sessionEnded = events.some((e) => e.type === "session_end");
+    return { events: events.length, screenshots: screenshotCount, userId, sessionId, sessionEnded };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
