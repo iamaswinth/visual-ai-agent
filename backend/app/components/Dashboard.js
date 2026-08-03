@@ -88,6 +88,7 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [captioning, setCaptioning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [note, setNote] = useState(null); // {kind, text}
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
@@ -155,7 +156,27 @@ export default function Dashboard() {
     }
   }
 
+  async function analyzeSessions() {
+    setAnalyzing(true);
+    setNote(null);
+    try {
+      const r = await fetch("/api/analyze/run", { method: "POST" }).then((r) => r.json());
+      if (r.ok) {
+        setNote({ kind: "ok", text: `Analyzed ${r.analyzed} session(s).` });
+        await refresh();
+        await refreshDetail(selectedRef.current);
+      } else {
+        setNote({ kind: "err", text: r.error || "analysis failed" });
+      }
+    } catch (e) {
+      setNote({ kind: "err", text: e.message });
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   const uncaptioned = stats.screenshots - stats.captioned;
+  const unanalyzed = sessions.filter((s) => !s.analyzedAt).length;
 
   return (
     <div className="wrap">
@@ -176,7 +197,14 @@ export default function Dashboard() {
       </div>
 
       <div className="toolbar">
-        <button className="btn" onClick={generateCaptions} disabled={captioning || uncaptioned <= 0}>
+        <button className="btn" onClick={analyzeSessions} disabled={analyzing || unanalyzed <= 0}>
+          {analyzing
+            ? "Analyzing…"
+            : unanalyzed > 0
+              ? `Analyze sessions (${unanalyzed})`
+              : "All sessions analyzed"}
+        </button>
+        <button className="btn ghost" onClick={generateCaptions} disabled={captioning || uncaptioned <= 0}>
           {captioning
             ? "Generating…"
             : uncaptioned > 0
@@ -207,10 +235,11 @@ export default function Dashboard() {
                 onClick={() => setSelectedId(s.sessionId)}
               >
                 <div className="session-id" style={{ fontFamily: "inherit", fontWeight: 600 }}>
-                  📍 {locationLabel(s)}
+                  {s.aiTitle || `📍 ${locationLabel(s)}`}
                 </div>
                 <div className="session-meta">
-                  {s.ip && <span>{s.ip}</span>}
+                  {s.aiCategory && <span className="cat">{s.aiCategory}</span>}
+                  <span>📍 {locationLabel(s)}</span>
                   <span>{fmtTime(s.startedAt)}</span>
                   <span>{s.eventCount} events</span>
                   <span>{s.screenshotCount} shots</span>
@@ -236,14 +265,32 @@ export default function Dashboard() {
             <>
               <div className="detail-head">
                 <div>
-                  <div className="detail-title">📍 {locationLabel(detail)}</div>
+                  <div className="detail-title">{detail.aiTitle || `📍 ${locationLabel(detail)}`}</div>
                   <div className="detail-sub">
-                    {detail.ip ? `${detail.ip} · ` : ""}
-                    {fmtTime(detail.startedAt)} · {detail.events.length} events ·{" "}
-                    {fmtDuration(detail.startedAt, detail.endedAt)}
+                    📍 {locationLabel(detail)}
+                    {detail.ip ? ` · ${detail.ip}` : ""} · {fmtTime(detail.startedAt)} ·{" "}
+                    {detail.events.length} events · {fmtDuration(detail.startedAt, detail.endedAt)}
                   </div>
                 </div>
               </div>
+              {detail.aiSummary ? (
+                <div className="ai-card">
+                  <div className="ai-card-head">
+                    <span className="ai-badge">AI</span>
+                    {detail.aiCategory && <span className="cat">{detail.aiCategory}</span>}
+                  </div>
+                  <p className="ai-summary">{detail.aiSummary}</p>
+                  {detail.aiInsights?.length > 0 && (
+                    <ul className="ai-insights">
+                      {detail.aiInsights.map((it, i) => (
+                        <li key={i}>{it}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <div className="ai-hint">Not analyzed yet — click “Analyze sessions” to have the agent summarize this session.</div>
+              )}
               <div className="timeline">
                 {detail.events.map((e) => (
                   <div key={e.id}>

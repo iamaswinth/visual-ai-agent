@@ -20,9 +20,9 @@ if (-not $running) {
         Write-Host "Starting existing vaa-pg container..."
         docker start vaa-pg | Out-Null
     } else {
-        Write-Host "Creating vaa-pg Postgres container on port 5434..."
+        Write-Host "Creating vaa-pg Postgres (pgvector) container on port 5434..."
         docker run --name vaa-pg -e POSTGRES_PASSWORD=postgres `
-            -e POSTGRES_DB=visual_ai_agent -p 5434:5432 -d postgres:16 | Out-Null
+            -e POSTGRES_DB=visual_ai_agent -p 5434:5432 -d pgvector/pgvector:pg16 | Out-Null
     }
 }
 Write-Host "Waiting for Postgres to be ready..."

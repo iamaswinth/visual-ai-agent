@@ -134,5 +134,36 @@
 .shot-caption .ai { color: var(--amber); font-weight: 700; font-style: normal; margin-right: 6px; font-size: 11px; letter-spacing: 0.04em; }
 .shot-trigger { font-size: 10px; color: var(--faint); margin-top: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
 
+/* Category chip */
+.cat {
+  text-transform: capitalize;
+  color: #b58cf0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+}
+
+/* AI summary card (session detail) */
+.ai-card {
+  margin: 12px 16px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(76, 139, 245, 0.10), var(--panel-2));
+  border: 1px solid var(--accent-dim);
+  border-radius: 10px;
+}
+.ai-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ai-badge {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  color: #fff; background: var(--accent); border-radius: 5px; padding: 2px 7px;
+}
+.ai-summary { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+.ai-insights { margin: 10px 0 0; padding-left: 18px; }
+.ai-insights li { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 2px 0; }
+.ai-hint {
+  margin: 12px 16px; padding: 12px 14px; font-size: 12px; color: var(--faint);
+  background: var(--panel-2); border: 1px dashed var(--border); border-radius: 10px;
+}
+
 .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
 .empty code { background: var(--panel-2); padding: 2px 7px; border-radius: 5px; color: var(--text); font-size: 13px; }
