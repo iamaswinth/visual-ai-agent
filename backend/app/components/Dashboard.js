@@ -89,6 +89,7 @@ export default function Dashboard() {
   const [detail, setDetail] = useState(null);
   const [captioning, setCaptioning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [indexing, setIndexing] = useState(false);
   const [note, setNote] = useState(null); // {kind, text}
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([]); // {role, content, sources?, error?}
@@ -179,6 +180,32 @@ export default function Dashboard() {
     }
   }
 
+  async function indexActivity() {
+    setIndexing(true);
+    setNote(null);
+    try {
+      let total = 0;
+      for (let i = 0; i < 25; i++) {
+        const r = await fetch("/api/index/run", { method: "POST" }).then((r) => r.json());
+        if (!r.ok) {
+          setNote({ kind: "err", text: r.error || "indexing failed" });
+          break;
+        }
+        total += r.indexed;
+        setNote({ kind: "ok", text: `Indexed ${total} activity documents… (${r.remaining} left)` });
+        await refresh();
+        if (r.remaining === 0 || r.indexed === 0) {
+          setNote({ kind: "ok", text: `Indexed ${total} activity documents — the agent can now search them.` });
+          break;
+        }
+      }
+    } catch (e) {
+      setNote({ kind: "err", text: e.message });
+    } finally {
+      setIndexing(false);
+    }
+  }
+
   async function sendChat() {
     const q = chatInput.trim();
     if (!q || chatStreaming) return;
@@ -250,13 +277,17 @@ export default function Dashboard() {
         <div className="stats">
           <StatTile value={stats.sessions} label="Sessions" />
           <StatTile value={stats.events} label="Events" />
-          <StatTile value={stats.screenshots} label="Screenshots" cls="accent" />
+          <StatTile value={stats.screenshots} label="Screenshots" />
           <StatTile value={stats.captioned} label="AI captioned" cls="green" />
+          <StatTile value={stats.indexed || 0} label="Indexed vectors" cls="accent" />
         </div>
       </div>
 
       <div className="toolbar">
-        <button className="btn" onClick={analyzeSessions} disabled={analyzing || unanalyzed <= 0}>
+        <button className="btn" onClick={indexActivity} disabled={indexing}>
+          {indexing ? "Indexing…" : "⚡ Index activity"}
+        </button>
+        <button className="btn ghost" onClick={analyzeSessions} disabled={analyzing || unanalyzed <= 0}>
           {analyzing
             ? "Analyzing…"
             : unanalyzed > 0
