@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Markdown from "@/components/Markdown";
 
 export default function Chat({ userId, userName }) {
   const [messages, setMessages] = useState([]);
@@ -68,7 +69,10 @@ export default function Chat({ userId, userName }) {
 
   return (
     <div className="flex flex-col overflow-hidden rounded-md border border-hairline bg-canvas">
-      <div className="border-b border-hairline px-4 py-3 text-[15px] text-ink">Ask the agent about {userName}</div>
+      <div className="flex items-center gap-2 border-b border-hairline px-4 py-3 text-[15px] text-ink">
+        <span className="inline-block size-2 rounded-full bg-coral" />
+        Ask the agent about {userName}
+      </div>
       <ScrollArea className="h-72 px-4 py-3">
         <div className="flex flex-col gap-3">
           {messages.length === 0 && (
@@ -76,25 +80,38 @@ export default function Chat({ userId, userName }) {
               e.g. “What did {userName} do today?”, “Any shopping sessions?”, “Which sites did they visit most?”
             </div>
           )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={cn(
-                "max-w-[85%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm",
-                m.role === "user"
-                  ? "self-end bg-ink text-white"
-                  : "self-start border border-hairline bg-surface-soft text-ink",
-                m.error && "border-coral text-coral"
-              )}
-            >
-              <div>{m.content || (m.role === "assistant" && streaming && i === messages.length - 1 ? "…" : "")}</div>
-              {m.role === "assistant" && m.sources?.length > 0 && (
-                <div className="mt-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  sources: {m.sources.map((s) => s.title).filter(Boolean).join(" · ") || "—"}
-                </div>
-              )}
-            </div>
-          ))}
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            const waiting = m.role === "assistant" && streaming && i === messages.length - 1 && !m.content;
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "max-w-[88%] rounded-lg px-3.5 py-2.5 text-sm",
+                  isUser
+                    ? "self-end bg-ink text-white"
+                    : cn("self-start border border-hairline bg-surface-soft text-body", m.error && "border-coral text-coral")
+                )}
+              >
+                {isUser ? (
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                ) : waiting ? (
+                  <div className="flex gap-1 py-0.5">
+                    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:-0.2s]" />
+                    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
+                    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
+                  </div>
+                ) : (
+                  <Markdown text={m.content} />
+                )}
+                {m.role === "assistant" && m.sources?.length > 0 && (
+                  <div className="mt-2 border-t border-hairline pt-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    sources: {m.sources.map((s) => s.title).filter(Boolean).join(" · ") || "—"}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </ScrollArea>
       <form
