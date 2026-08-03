@@ -61,11 +61,13 @@ export async function captionScreenshot(shot) {
  */
 export async function captionBatch(limit = 10) {
   const pool = getPool();
+  // url/title live on the linked event, not on screenshots — join for context.
   const { rows } = await pool.query(
-    `SELECT id, mime, bytes, url, title
-       FROM screenshots
-      WHERE caption IS NULL
-      ORDER BY id ASC
+    `SELECT sc.id, sc.mime, sc.bytes, ev.url, ev.title
+       FROM screenshots sc
+       LEFT JOIN events ev ON ev.id = sc.event_id
+      WHERE sc.caption IS NULL
+      ORDER BY sc.id ASC
       LIMIT $1`,
     [limit]
   );
