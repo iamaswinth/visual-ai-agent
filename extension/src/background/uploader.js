@@ -82,9 +82,11 @@ export async function flush() {
 async function postWithRetry(batch) {
   for (let attempt = 0; attempt <= CONFIG.UPLOAD_MAX_RETRIES; attempt++) {
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (CONFIG.INGEST_TOKEN) headers["x-ingest-token"] = CONFIG.INGEST_TOKEN;
       const res = await fetch(ingestUrl(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(batch),
       });
       if (res.ok) return true;

@@ -12,8 +12,16 @@ export const runtime = "nodejs";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, x-ingest-token",
 };
+
+// When INGEST_TOKEN is configured, the extension must send it as x-ingest-token.
+// If unset (local dev), ingest is open so test:ingest and the local flow work.
+function tokenOk(request) {
+  const expected = process.env.INGEST_TOKEN;
+  if (!expected) return true;
+  return request.headers.get("x-ingest-token") === expected;
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -27,6 +35,10 @@ export async function OPTIONS() {
 }
 
 export async function POST(request) {
+  if (!tokenOk(request)) {
+    return json({ ok: false, error: "unauthorized" }, 401);
+  }
+
   let batch;
   try {
     batch = await request.json();
